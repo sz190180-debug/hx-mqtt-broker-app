@@ -1,0 +1,161 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "noMore": "没有更多了",
+    "error": "错误",
+    "success": "成功",
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑",
+    "back": "返回",
+    "refresh": "刷新",
+    "retry": "重试",
+    "close": "关闭"
+  },
+  "login": {
+    "title": "AGV呼叫系统",
+    "username": "用户名",
+    "clientId": "手机号/序列号",
+    "password": "密码",
+    "loginButton": "登录",
+    "connecting": "连接中...",
+    "loginSuccess": "登录成功",
+    "loginFailed": "登录失败",
+    "pleaseEnterUsername": "请输入用户名",
+    "pleaseEnterClientId": "请输入手机号/序列号",
+    "pleaseEnterPassword": "请输入密码",
+    "pleaseEnterAddress": "请输入连接地址和端口",
+    "connectionTimeout": "连接超时，请检查网络或服务器地址",
+    "connectionFailed": "连接失败",
+    "usernamePasswordError": "连接失败：用户名或密码错误",
+    "unauthorized": "连接失败：未授权",
+    "unknownError": "连接失败：未知返回码",
+    "unknownConnectionError": "连接失败: 未知错误",
+    "mqttConnecting": "MQTT连接中...",
+    "mqttConnected": "MQTT连接成功",
+    "mqttDisconnected": "MQTT连接断开",
+    "settings": {
+      "addressModify": "地址修改",
+      "portModify": "修改端口",
+      "confirm": "确定"
+    }
+  },
+  "tabs": {
+    "tasks": "任务",
+    "vehicles": "我的车辆",
+    "warehouse": "仓库管理"
+  },
+  "tasks": {
+    "title": "任务模板",
+    "allGroups": "全部",
+    "selectGroup": "选择分组",
+    "noTemplates": "暂无模板",
+    "executeTask": "执行任务",
+    "taskExecuted": "任务已执行",
+    "executionFailed": "执行失败",
+    "mqttNotConnected": "正在恢复与服务器的连接,请稍后重试",
+    "taskPending": "任务下发未执行",
+    "taskExecuting": "任务执行中...",
+    "confirmSendTask": "确定要下发该任务吗？",
+    "noAlias": "未设置别名",
+    "sendSuccess": "发送成功",
+    "sendFailed": "发送失败",
+    "waitForTaskComplete": "请等待任务下发完成"
+  },
+  "vehicles": {
+    "title": "我的车辆",
+    "noVehicles": "暂无车辆",
+    "batteryLevel": "电量",
+    "cargoStatus": {
+      "loaded": "载货中",
+      "empty": "未载货"
+    },
+    "connectionStatus": {
+      "offline": "离线",
+      "online": "在线"
+    },
+    "workState": {
+      "idle": "空闲",
+      "working": "工作中",
+      "charging": "充电中",
+      "trafficWaiting": "交管等待",
+      "hosting": "托管中",
+      "externalInterrupt": "外部中断",
+      "unknown": "未知",
+      "abnormalPause": "异常暂停",
+      "waitingScheduleConfirm": "等待调度确认"
+    },
+    "status": {
+      "idle": "空闲",
+      "working": "工作中",
+      "charging": "充电中",
+      "error": "故障",
+      "offline": "离线"
+    },
+    "state": {
+      "normal": "正常",
+      "warning": "警告",
+      "error": "错误"
+    }
+  },
+  "warehouse": {
+    "title": "仓库管理",
+    "selectWarehouse": "选择仓库",
+    "noWarehouse": "暂无仓库",
+    "noDescription": "暂无描述",
+    "usageRate": "库位使用率",
+    "totalPositions": "总点位",
+    "availablePositions": "可用",
+    "occupiedPositions": "占用",
+    "disabledPositions": "禁用",
+    "visualization": "库位可视化展示",
+    "batchMode": "批量模式",
+    "exitBatch": "退出批量",
+    "batchOperations": "批量操作",
+    "setAvailable": "设为可用",
+    "setOccupied": "设为占用",
+    "setDisabled": "设为禁用",
+    "positionDetail": "点位详情",
+    "positionId": "点位ID",
+    "positionName": "点位名称",
+    "positionOrder": "排序",
+    "currentStatus": "当前状态",
+    "operationHistory": "操作历史",
+    "noHistory": "暂无历史记录",
+    "mapPositionInfo": "地图点位信息",
+    "positionCode": "点位编码",
+    "positionAlias": "点位别名",
+    "noAlias": "无别名",
+    "coordinates": "坐标",
+    "angle": "角度",
+    "batchModifyStatus": "批量修改状态",
+    "confirmModify": "确定修改",
+    "batchOperations": "批量操作",
+    "modifyStatus": "修改状态",
+    "selectAll": "全选",
+    "clearSelection": "清空",
+    "status": {
+      "available": "可用",
+      "occupied": "占用",
+      "disabled": "禁用"
+    },
+    "operations": {
+      "updateSuccess": "更新成功",
+      "updateFailed": "更新失败",
+      "batchUpdateSuccess": "批量更新成功",
+      "batchUpdateFailed": "批量更新失败",
+      "getWarehouseDataFailed": "获取仓库数据失败",
+      "getColumnDataFailed": "获取库位列数据失败",
+      "getPositionDataFailed": "获取点位数据失败",
+      "pleaseSelectPositions": "请先选择要修改的点位",
+      "confirmBatchModify": "确认批量修改"
+    }
+  },
+  "notFound": {
+    "title": "Oops!",
+    "message": "这个页面不存在",
+    "goHome": "返回首页!"
+  }
+}

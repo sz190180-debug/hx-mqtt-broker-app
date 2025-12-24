@@ -1,0 +1,161 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "noMore": "No more data",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "close": "Close"
+  },
+  "login": {
+    "title": "AGV Call System",
+    "username": "Username",
+    "clientId": "Phone/Serial Number",
+    "password": "Password",
+    "loginButton": "Login",
+    "connecting": "Connecting...",
+    "loginSuccess": "Login successful",
+    "loginFailed": "Login failed",
+    "pleaseEnterUsername": "Please enter username",
+    "pleaseEnterClientId": "Please enter phone/serial number",
+    "pleaseEnterPassword": "Please enter password",
+    "pleaseEnterAddress": "Please enter connection address and port",
+    "connectionTimeout": "Connection timeout, please check network or server address",
+    "connectionFailed": "Connection failed",
+    "usernamePasswordError": "Connection failed: Invalid username or password",
+    "unauthorized": "Connection failed: Unauthorized",
+    "unknownError": "Connection failed: Unknown return code",
+    "unknownConnectionError": "Connection failed: Unknown error",
+    "mqttConnecting": "MQTT connecting...",
+    "mqttConnected": "MQTT connected",
+    "mqttDisconnected": "MQTT disconnected",
+    "settings": {
+      "addressModify": "Modify Address",
+      "portModify": "Modify Port",
+      "confirm": "Confirm"
+    }
+  },
+  "tabs": {
+    "tasks": "Tasks",
+    "vehicles": "My Vehicles",
+    "warehouse": "Warehouse"
+  },
+  "tasks": {
+    "title": "Task Templates",
+    "allGroups": "All",
+    "selectGroup": "Select Group",
+    "noTemplates": "No templates",
+    "executeTask": "Execute Task",
+    "taskExecuted": "Task executed",
+    "executionFailed": "Execution failed",
+    "mqttNotConnected": "Reconnecting to the server, please try again later",
+    "taskPending": "Task sent but not executed",
+    "taskExecuting": "Task executing...",
+    "confirmSendTask": "Are you sure you want to send this task?",
+    "noAlias": "No alias set",
+    "sendSuccess": "Send successful",
+    "sendFailed": "Send failed",
+    "waitForTaskComplete": "Please wait for task completion"
+  },
+  "vehicles": {
+    "title": "My Vehicles",
+    "noVehicles": "No vehicles",
+    "batteryLevel": "Battery",
+    "cargoStatus": {
+      "loaded": "Loaded",
+      "empty": "Empty"
+    },
+    "connectionStatus": {
+      "offline": "Offline",
+      "online": "Online"
+    },
+    "workState": {
+      "idle": "Idle",
+      "working": "Working",
+      "charging": "Charging",
+      "trafficWaiting": "Traffic Waiting",
+      "hosting": "Hosting",
+      "externalInterrupt": "External Interrupt",
+      "unknown": "Unknown",
+      "abnormalPause": "Abnormal Pause",
+      "waitingScheduleConfirm": "Waiting Schedule Confirm"
+    },
+    "status": {
+      "idle": "Idle",
+      "working": "Working",
+      "charging": "Charging",
+      "error": "Error",
+      "offline": "Offline"
+    },
+    "state": {
+      "normal": "Normal",
+      "warning": "Warning",
+      "error": "Error"
+    }
+  },
+  "warehouse": {
+    "title": "Warehouse Management",
+    "selectWarehouse": "Select Warehouse",
+    "noWarehouse": "No warehouse",
+    "noDescription": "No description",
+    "usageRate": "Usage Rate",
+    "totalPositions": "Total Positions",
+    "availablePositions": "Available",
+    "occupiedPositions": "Occupied",
+    "disabledPositions": "Disabled",
+    "visualization": "Position Visualization",
+    "batchMode": "Batch Mode",
+    "exitBatch": "Exit Batch",
+    "batchOperations": "Batch Operations",
+    "setAvailable": "Set Available",
+    "setOccupied": "Set Occupied",
+    "setDisabled": "Set Disabled",
+    "positionDetail": "Position Detail",
+    "positionId": "Position ID",
+    "positionName": "Position Name",
+    "positionOrder": "Order",
+    "currentStatus": "Current Status",
+    "operationHistory": "Operation History",
+    "noHistory": "No history records",
+    "mapPositionInfo": "Map Position Info",
+    "positionCode": "Position Code",
+    "positionAlias": "Position Alias",
+    "noAlias": "No alias",
+    "coordinates": "Coordinates",
+    "angle": "Angle",
+    "batchModifyStatus": "Batch Modify Status",
+    "confirmModify": "Confirm Modify",
+    "batchOperations": "Batch Operations",
+    "modifyStatus": "Modify Status",
+    "selectAll": "Select All",
+    "clearSelection": "Clear",
+    "status": {
+      "available": "Available",
+      "occupied": "Occupied",
+      "disabled": "Disabled"
+    },
+    "operations": {
+      "updateSuccess": "Update successful",
+      "updateFailed": "Update failed",
+      "batchUpdateSuccess": "Batch update successful",
+      "batchUpdateFailed": "Batch update failed",
+      "getWarehouseDataFailed": "Failed to get warehouse data",
+      "getColumnDataFailed": "Failed to get column data",
+      "getPositionDataFailed": "Failed to get position data",
+      "pleaseSelectPositions": "Please select positions to modify first",
+      "confirmBatchModify": "Confirm Batch Modify"
+    }
+  },
+  "notFound": {
+    "title": "Oops!",
+    "message": "This page doesn't exist",
+    "goHome": "Go to home screen!"
+  }
+}
