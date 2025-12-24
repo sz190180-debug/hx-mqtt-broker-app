@@ -48,3 +48,19 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+
+## 云端打包
+
+```bash
+npm install -g eas-cli
+```
+
+# 登录网站：https://expo.dev/
+```bash
+eas login
+```
+
+```bash
+eas build -p android
+```

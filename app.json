@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Forklift Call",
-    "slug": "huixinNativeApp",
+    "slug": "huixin2-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -43,8 +43,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "0511bc98-f837-4fc3-84dd-f6d0df8d211d"
+        "projectId": "2aa2c435-507e-447d-bba2-810296b1c530"
       }
-    }
+    },
+    "owner": "shijia"
   }
 }

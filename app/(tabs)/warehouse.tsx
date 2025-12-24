@@ -563,30 +563,34 @@ export default function WarehousePage() {
               />
             </TouchableOpacity>
 
-            {showWarehouseSelector && (
-              <View style={styles.headerDropdownContainer}>
-                {warehouses.map((warehouse: Warehouse) => (
-                  <TouchableOpacity
-                    key={warehouse.warehouseId}
-                    style={[
-                      styles.headerDropdownItem,
-                      selectedWarehouse?.warehouseId === warehouse.warehouseId && styles.headerSelectedItem
-                    ]}
-                    onPress={() => {
-                      selectWarehouse(warehouse);
-                      setShowWarehouseSelector(false);
-                    }}
-                  >
-                    <Text style={[
-                      styles.headerDropdownItemText,
-                      selectedWarehouse?.warehouseId === warehouse.warehouseId && styles.headerSelectedItemText
-                    ]}>
-                      {warehouse.warehouseName}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+              {showWarehouseSelector && (
+                  <View style={styles.headerDropdownContainer}>
+                      <FlatList
+                          data={warehouses}
+                          keyExtractor={(item) => item.warehouseId.toString()}
+                          showsVerticalScrollIndicator={true}
+                          renderItem={({ item: warehouse }) => (
+                              <TouchableOpacity
+                                  style={[
+                                      styles.headerDropdownItem,
+                                      selectedWarehouse?.warehouseId === warehouse.warehouseId && styles.headerSelectedItem
+                                  ]}
+                                  onPress={() => {
+                                      selectWarehouse(warehouse);
+                                      setShowWarehouseSelector(false);
+                                  }}
+                              >
+                                  <Text style={[
+                                      styles.headerDropdownItemText,
+                                      selectedWarehouse?.warehouseId === warehouse.warehouseId && styles.headerSelectedItemText
+                                  ]}>
+                                      {warehouse.warehouseName}
+                                  </Text>
+                              </TouchableOpacity>
+                          )}
+                      />
+                  </View>
+              )}
           </View>
 
           <View style={styles.headerButtons}>
