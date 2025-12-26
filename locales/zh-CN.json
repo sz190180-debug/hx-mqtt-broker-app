@@ -63,7 +63,8 @@
     "noAlias": "未设置别名",
     "sendSuccess": "发送成功",
     "sendFailed": "发送失败",
-    "waitForTaskComplete": "请等待任务下发完成"
+    "waitForTaskComplete": "请等待任务下发完成",
+    "fullWarehouseIds": "下料点位已满，禁止下发"
   },
   "vehicles": {
     "title": "我的车辆",

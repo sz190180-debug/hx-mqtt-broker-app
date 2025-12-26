@@ -63,7 +63,8 @@
     "noAlias": "No alias set",
     "sendSuccess": "Send successful",
     "sendFailed": "Send failed",
-    "waitForTaskComplete": "Please wait for task completion"
+    "waitForTaskComplete": "Please wait for task completion",
+    "fullWarehouseIds": "The cutting point is full, and distribution is prohibited."
   },
   "vehicles": {
     "title": "My Vehicles",
