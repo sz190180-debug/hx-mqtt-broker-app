@@ -1,21 +1,21 @@
 import MyMqttClient from "@/utils/mqtt";
-import {t} from "@/utils/i18n";
+import { t } from "@/utils/i18n";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import {router, useFocusEffect} from "expo-router";
-import React, {useCallback, useEffect, useRef, useState} from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     Alert,
     FlatList,
-    ListRenderItemInfo,
     StyleSheet,
     ToastAndroid,
     TouchableOpacity,
-    useWindowDimensions,
     View,
+    useWindowDimensions,
+    ListRenderItemInfo,
 } from "react-native";
-import {useSafeAreaInsets} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SelectDropdown from "react-native-select-dropdown";
-import {Text, YStack} from "tamagui";
+import { Text, YStack } from "tamagui";
 
 // --- 类型定义 ---
 type ITemplateList = {
@@ -26,7 +26,7 @@ type ITemplateList = {
     status: ITaskStatus;
     alias: string;
     lastTaskChainId: number;
-    warehouseId?: number;
+    warehouseId?: number; // 仓库ID
 };
 
 enum ITaskStatus {
@@ -37,6 +37,7 @@ enum ITaskStatus {
     abnormal = 4,
     jump = 5,
     suspend = 6,
+    warehouse_full = 7,
 }
 
 // --- 常量定义 ---
@@ -64,70 +65,58 @@ export default function TaskTemplates() {
     const [isLoading, setLoading] = useState(false);
     const [sendLoading, setSendLoading] = useState(false);
 
-    // --- Refs ---
+    // 存储满仓的仓库ID集合
+    const [fullWarehouseIds, setFullWarehouseIds] = useState<Set<number>>(new Set());
+
     const pageInfoRef = useRef({ pageNum: 1, pageSize: 20 });
     const templatesRef = useRef<ITemplateList[]>([]);
     const taskProgressRef = useRef<number[]>([]);
+    const timer = useRef<NodeJS.Timeout | null>(null);
 
-    // [关键] 同步锁：用于在异步 State 更新前拦截重复请求
-    const loadingRef = useRef(false);
-    // [关键] 滚动锁：防止 onEndReached 在组件挂载时自动触发
-    const onEndReachedCalledDuringMomentum = useRef(true);
-
-    // 保持 Ref 与 State 同步（双重保障）
     useEffect(() => {
         templatesRef.current = templates;
     }, [templates]);
 
     const client = MyMqttClient.getInstance(false);
-    const timer = useRef<NodeJS.Timeout | null>(null);
 
     // --- MQTT 消息处理 ---
     const listenMessage = useCallback((topic: string, message: any) => {
-        // 1. 列表数据返回
+        // 监听满仓信息主题
+        if (topic === client.apiTheme.rep["queryFullWarehouse"]()) {
+            try {
+                const res = JSON.parse(message.toString());
+                // 根据 JSON 结构 {"d":{"reqId":..., "value":[5]}} 解析
+                if (res.d && res.d.code === 10000) {
+                    const ids = res.d.value || [];
+                    if (Array.isArray(ids)) {
+                        setFullWarehouseIds(new Set(ids));
+                    }
+                }
+            } catch (e) {
+                console.error("解析满仓数据失败", e);
+            }
+            return;
+        }
+
         if (topic === client.apiTheme.rep["taskTemp"]()) {
             const res = JSON.parse(message.toString());
-
-            // 请求完成，立即解锁
             setLoading(false);
-            loadingRef.current = false;
 
             const newRecords = res.d.records || [];
-
-            // [熔断机制] 如果后端返回空数组，直接标记无更多数据
-            // 防止 total 计算错误导致的死循环
-            if (newRecords.length === 0) {
-                setHasMore(false);
-                return;
-            }
-
-            // 获取当前数据源
             const currentList = pageInfoRef.current.pageNum === 1 ? [] : templatesRef.current;
+            const result = [...currentList, ...newRecords];
 
-            // [数据去重] 使用 Map 防止网络重试导致的重复 Key
-            const combinedList = [...currentList, ...newRecords];
-            const uniqueMap = new Map();
-            combinedList.forEach((item) => {
-                if (item && item.taskChainTemplateId) {
-                    uniqueMap.set(item.taskChainTemplateId, item);
-                }
-            });
-            const result = Array.from(uniqueMap.values());
-
-            // 更新状态
             setTemplates(result);
-            templatesRef.current = result; // [重要] 手动同步 Ref
 
-            // 提取需要轮询的任务 ID
             const newProgressIds = result
                 .filter((item) => !!item.lastTaskChainId)
                 .map((item) => item.lastTaskChainId);
+
             const combinedProgress = [...new Set([...taskProgressRef.current, ...newProgressIds])];
             taskProgressRef.current = combinedProgress;
 
             if (combinedProgress.length > 0) queryTaskStatus(combinedProgress);
 
-            // 分页判断
             if (result.length >= res.d.total) {
                 setHasMore(false);
             } else {
@@ -135,7 +124,6 @@ export default function TaskTemplates() {
             }
         }
 
-        // 2. 分组数据返回
         if (topic === client.apiTheme.rep["queryGroup"]()) {
             const res = JSON.parse(message.toString());
             const group = res.d.value || [];
@@ -145,42 +133,30 @@ export default function TaskTemplates() {
             ]);
         }
 
-        // 3. 发送任务结果
         if (topic === client.apiTheme.rep["taskSend"]()) {
             const res = JSON.parse(message.toString());
             setSendLoading(false);
-
             if (res.d.code === 10000) {
-                const updateLogic = (list: ITemplateList[]) => {
-                    return list.map((item) => {
+                setTemplates((prev) =>
+                    prev.map((item) => {
                         if (item.taskChainTemplateId === res.d.taskTemplateId) {
                             return { ...item, lastTaskChainId: res.d.taskId };
                         }
                         return item;
-                    });
-                };
-
-                setTemplates((prev) => {
-                    const next = updateLogic(prev);
-                    templatesRef.current = next; // 同步 Ref
-                    return next;
-                });
-
+                    })
+                );
                 const newProgress = [...new Set([...taskProgressRef.current, res.d.taskId])];
                 taskProgressRef.current = newProgress;
                 queryTaskStatus(newProgress);
-
                 ToastAndroid.show(t("tasks.sendSuccess"), ToastAndroid.SHORT);
             } else {
                 ToastAndroid.show(`${t("tasks.sendFailed")}:${res.d.msg}`, ToastAndroid.SHORT);
             }
         }
 
-        // 4. 任务状态更新
         if (topic === client.apiTheme.rep["taskStatus"]()) {
             const res = JSON.parse(message.toString());
             const tasks: any[] = res.d.value || [];
-
             if (tasks.length === 0) return;
 
             const activeIds = tasks
@@ -189,21 +165,15 @@ export default function TaskTemplates() {
 
             taskProgressRef.current = activeIds;
 
-            const updateLogic = (list: ITemplateList[]) => {
-                return list.map((item) => {
+            setTemplates((prev) =>
+                prev.map((item) => {
                     const findTask = tasks.find((task) => task.taskChainId === item.lastTaskChainId);
                     if (findTask && findTask.status !== item.status) {
                         return { ...item, status: findTask.status };
                     }
                     return item;
-                });
-            };
-
-            setTemplates((prev) => {
-                const next = updateLogic(prev);
-                templatesRef.current = next; // 同步 Ref
-                return next;
-            });
+                })
+            );
         }
     }, []);
 
@@ -215,20 +185,13 @@ export default function TaskTemplates() {
     };
 
     const queryList = () => {
-        // [修复] 使用 loadingRef.current 同步检查，防止闭包导致的重复请求
-        if (loadingRef.current) return;
-
         if (sendLoading) {
             ToastAndroid.show(t("tasks.waitForTaskComplete"), ToastAndroid.SHORT);
             return;
         }
-        // 如果没有更多且不是首页，则退出
         if (!hasMore && pageInfoRef.current.pageNum !== 1) return;
 
-        // [修复] 立即加锁
-        loadingRef.current = true;
         setLoading(true);
-
         client.send("taskTemp", {
             payload: {
                 d: {
@@ -245,30 +208,32 @@ export default function TaskTemplates() {
             router.replace("/");
             return;
         }
-        const topics = ["taskTemp", "taskSend", "queryGroup", "taskStatus"];
-        topics.forEach((t) => client.subscribe(t));
+
+        const topics = ["taskTemp", "taskSend", "queryGroup", "taskStatus", "queryFullWarehouse"];
+
+        topics.forEach((t) => {
+            if (client.apiTheme.rep[t as keyof typeof client.apiTheme.rep]) {
+                client.subscribe(t as any);
+            }
+        });
+
         client.listenerMessage("message", listenMessage);
         client.send("queryGroup", { payload: { d: {} } });
 
-        // 初始加载
+        if (client.apiTheme.req["queryFullWarehouse" as keyof typeof client.apiTheme.req]) {
+            client.send("queryFullWarehouse" as any, { payload: { d: {} } });
+        }
+
         queryList();
 
         return () => {};
     }, []);
 
-    // 切换分组时重置所有状态
     useEffect(() => {
         if (groupName) {
             pageInfoRef.current.pageNum = 1;
             setHasMore(true);
             setTemplates([]);
-            templatesRef.current = [];
-
-            // 重置所有锁
-            loadingRef.current = false;
-            setLoading(false);
-            onEndReachedCalledDuringMomentum.current = true; // 重置滚动锁，防止切换后自动触发加载
-
             setTimeout(queryList, 0);
         }
     }, [groupName]);
@@ -295,7 +260,9 @@ export default function TaskTemplates() {
             return;
         }
 
-        if (item.status === ITaskStatus.warehouse_full) {
+        // 仅当满仓时(红点)进行拦截
+        if (item.warehouseId && fullWarehouseIds.has(item.warehouseId)) {
+            ToastAndroid.show("当前仓库已满，无法下发", ToastAndroid.SHORT);
             return;
         }
 
@@ -317,10 +284,16 @@ export default function TaskTemplates() {
         ]);
     };
 
+    // --- 渲染 ---
     const renderItem = useCallback(
         ({ item }: ListRenderItemInfo<ITemplateList>) => {
             const config = STATUS_CONFIG[item.status] || DEFAULT_STYLE;
-            const isDisable = item.status === ITaskStatus.warehouse_full;
+
+            // 满仓判断
+            const isWarehouseFull = !!(item.warehouseId && fullWarehouseIds.has(item.warehouseId));
+
+            // 禁用逻辑：只有满仓时才禁用，允许绿点点击
+            const isDisable = isWarehouseFull;
 
             return (
                 <TouchableOpacity
@@ -333,10 +306,34 @@ export default function TaskTemplates() {
                             backgroundColor: config.bg,
                             marginLeft: 10,
                             marginTop: 10,
+                            opacity: isDisable ? 0.7 : 1,
                         },
                     ]}
                     onPress={() => sendTemplate(item)}
                 >
+                    {/* 右上角状态点 */}
+                    <View
+                        style={{
+                            position: "absolute",
+                            top: 6,
+                            right: 6,
+                            // [修改] 样式调整为完美的圆形点点
+                            width: isWarehouseFull ? 24 : 16,   // 红点大，绿点稍小
+                            height: isWarehouseFull ? 24 : 16,
+                            borderRadius: 9999, // 设为极大值，确保绝对是圆形
+                            // 红色：满仓；绿色：正常
+                            backgroundColor: isWarehouseFull ? "#ff4d4f" : "#52c41a",
+                            borderWidth: 2, // 增加白边宽度
+                            borderColor: "#ffffff",
+                            zIndex: 10,
+                            elevation: 5, // 增加立体感阴影
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 3,
+                        }}
+                    />
+
                     <View style={styles.textContainer}>
                         <Text style={[styles.itemText, { color: config.color }]}>
                             {item.alias || "-"}
@@ -349,7 +346,7 @@ export default function TaskTemplates() {
                 </TouchableOpacity>
             );
         },
-        [itemSize]
+        [itemSize, fullWarehouseIds]
     );
 
     return (
@@ -388,23 +385,11 @@ export default function TaskTemplates() {
                         renderItem={renderItem}
                         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
                         showsVerticalScrollIndicator={false}
-
-                        // [关键修改] 调整触发距离，0.1 表示剩余 10% 长度时触发
-                        onEndReachedThreshold={0.1}
-
-                        // [关键修改] 配合锁机制，只有在发生真实滚动后才允许触发加载
-                        onMomentumScrollBegin={() => {
-                            onEndReachedCalledDuringMomentum.current = false;
-                        }}
-
+                        onEndReachedThreshold={0.5}
                         onEndReached={() => {
-                            // 仅当用户滑动过(锁为false)、且不在加载中、且有更多数据时触发
-                            if (!onEndReachedCalledDuringMomentum.current && hasMore && !loadingRef.current) {
-                                onEndReachedCalledDuringMomentum.current = true; // 重新上锁
-                                queryList();
-                            }
+                            if (!hasMore || isLoading) return;
+                            queryList();
                         }}
-
                         ListFooterComponent={
                             <View style={styles.footer}>
                                 <Text style={{ color: "#999" }}>
@@ -442,10 +427,12 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 3,
+        position: 'relative',
     },
     textContainer: {
         flex: 1,
         width: "100%",
+        marginTop: 15,
     },
     itemText: {
         fontSize: 16,
