@@ -26,6 +26,7 @@ type ITemplateList = {
     status: ITaskStatus;
     alias: string;
     lastTaskChainId: number;
+    warehouseId?: number; // [新增] 增加仓库ID字段
 };
 
 enum ITaskStatus {
@@ -36,6 +37,7 @@ enum ITaskStatus {
     abnormal = 4,
     jump = 5,
     suspend = 6,
+    warehouse_full = 7, // 假设这里有一个对应的库位已满状态，根据之前的逻辑推断
 }
 
 // --- 常量定义 ---
