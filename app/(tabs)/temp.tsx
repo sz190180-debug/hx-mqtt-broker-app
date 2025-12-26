@@ -1,21 +1,21 @@
 import MyMqttClient from "@/utils/mqtt";
-import { t } from "@/utils/i18n";
+import {t} from "@/utils/i18n";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import {router, useFocusEffect} from "expo-router";
+import React, {useCallback, useEffect, useRef, useState} from "react";
 import {
     Alert,
     FlatList,
+    ListRenderItemInfo,
     StyleSheet,
     ToastAndroid,
     TouchableOpacity,
-    View,
     useWindowDimensions,
-    ListRenderItemInfo,
+    View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {useSafeAreaInsets} from "react-native-safe-area-context";
 import SelectDropdown from "react-native-select-dropdown";
-import { Text, YStack } from "tamagui";
+import {Text, YStack} from "tamagui";
 
 // --- 类型定义 ---
 type ITemplateList = {
@@ -37,7 +37,6 @@ enum ITaskStatus {
     abnormal = 4,
     jump = 5,
     suspend = 6,
-    warehouse_full = 7,
 }
 
 // --- 常量定义 ---
@@ -52,7 +51,7 @@ export default function TaskTemplates() {
     const { width: windowWidth } = useWindowDimensions();
     const insets = useSafeAreaInsets();
 
-    const MIN_ITEM_WIDTH = 130;
+    const MIN_ITEM_WIDTH = 120;
     const CONTAINER_PADDING = 10;
     const numColumns = Math.max(1, Math.floor((windowWidth - CONTAINER_PADDING) / MIN_ITEM_WIDTH));
     const itemSize = (windowWidth - CONTAINER_PADDING - (numColumns + 1) * 10) / numColumns;
@@ -69,9 +68,13 @@ export default function TaskTemplates() {
     const pageInfoRef = useRef({ pageNum: 1, pageSize: 20 });
     const templatesRef = useRef<ITemplateList[]>([]);
     const taskProgressRef = useRef<number[]>([]);
-    // [新增] loadingRef 用于同步阻断重复请求
-    const loadingRef = useRef(false);
 
+    // [关键] 同步锁：用于在异步 State 更新前拦截重复请求
+    const loadingRef = useRef(false);
+    // [关键] 滚动锁：防止 onEndReached 在组件挂载时自动触发
+    const onEndReachedCalledDuringMomentum = useRef(true);
+
+    // 保持 Ref 与 State 同步（双重保障）
     useEffect(() => {
         templatesRef.current = templates;
     }, [templates]);
@@ -81,18 +84,27 @@ export default function TaskTemplates() {
 
     // --- MQTT 消息处理 ---
     const listenMessage = useCallback((topic: string, message: any) => {
+        // 1. 列表数据返回
         if (topic === client.apiTheme.rep["taskTemp"]()) {
             const res = JSON.parse(message.toString());
 
-            // 请求结束，释放锁
+            // 请求完成，立即解锁
             setLoading(false);
             loadingRef.current = false;
 
             const newRecords = res.d.records || [];
 
+            // [熔断机制] 如果后端返回空数组，直接标记无更多数据
+            // 防止 total 计算错误导致的死循环
+            if (newRecords.length === 0) {
+                setHasMore(false);
+                return;
+            }
+
+            // 获取当前数据源
             const currentList = pageInfoRef.current.pageNum === 1 ? [] : templatesRef.current;
 
-            // 数据去重逻辑
+            // [数据去重] 使用 Map 防止网络重试导致的重复 Key
             const combinedList = [...currentList, ...newRecords];
             const uniqueMap = new Map();
             combinedList.forEach((item) => {
@@ -102,18 +114,20 @@ export default function TaskTemplates() {
             });
             const result = Array.from(uniqueMap.values());
 
+            // 更新状态
             setTemplates(result);
-            templatesRef.current = result;
+            templatesRef.current = result; // [重要] 手动同步 Ref
 
+            // 提取需要轮询的任务 ID
             const newProgressIds = result
                 .filter((item) => !!item.lastTaskChainId)
                 .map((item) => item.lastTaskChainId);
-
             const combinedProgress = [...new Set([...taskProgressRef.current, ...newProgressIds])];
             taskProgressRef.current = combinedProgress;
 
             if (combinedProgress.length > 0) queryTaskStatus(combinedProgress);
 
+            // 分页判断
             if (result.length >= res.d.total) {
                 setHasMore(false);
             } else {
@@ -121,6 +135,7 @@ export default function TaskTemplates() {
             }
         }
 
+        // 2. 分组数据返回
         if (topic === client.apiTheme.rep["queryGroup"]()) {
             const res = JSON.parse(message.toString());
             const group = res.d.value || [];
@@ -130,6 +145,7 @@ export default function TaskTemplates() {
             ]);
         }
 
+        // 3. 发送任务结果
         if (topic === client.apiTheme.rep["taskSend"]()) {
             const res = JSON.parse(message.toString());
             setSendLoading(false);
@@ -146,7 +162,7 @@ export default function TaskTemplates() {
 
                 setTemplates((prev) => {
                     const next = updateLogic(prev);
-                    templatesRef.current = next;
+                    templatesRef.current = next; // 同步 Ref
                     return next;
                 });
 
@@ -160,6 +176,7 @@ export default function TaskTemplates() {
             }
         }
 
+        // 4. 任务状态更新
         if (topic === client.apiTheme.rep["taskStatus"]()) {
             const res = JSON.parse(message.toString());
             const tasks: any[] = res.d.value || [];
@@ -184,7 +201,7 @@ export default function TaskTemplates() {
 
             setTemplates((prev) => {
                 const next = updateLogic(prev);
-                templatesRef.current = next;
+                templatesRef.current = next; // 同步 Ref
                 return next;
             });
         }
@@ -198,12 +215,14 @@ export default function TaskTemplates() {
     };
 
     const queryList = () => {
-        // [修复] 使用 loadingRef.current 进行同步检查
+        // [修复] 使用 loadingRef.current 同步检查，防止闭包导致的重复请求
         if (loadingRef.current) return;
+
         if (sendLoading) {
             ToastAndroid.show(t("tasks.waitForTaskComplete"), ToastAndroid.SHORT);
             return;
         }
+        // 如果没有更多且不是首页，则退出
         if (!hasMore && pageInfoRef.current.pageNum !== 1) return;
 
         // [修复] 立即加锁
@@ -237,15 +256,19 @@ export default function TaskTemplates() {
         return () => {};
     }, []);
 
+    // 切换分组时重置所有状态
     useEffect(() => {
         if (groupName) {
             pageInfoRef.current.pageNum = 1;
             setHasMore(true);
             setTemplates([]);
             templatesRef.current = [];
-            // 重置锁，防止之前的请求卡死状态
+
+            // 重置所有锁
             loadingRef.current = false;
             setLoading(false);
+            onEndReachedCalledDuringMomentum.current = true; // 重置滚动锁，防止切换后自动触发加载
+
             setTimeout(queryList, 0);
         }
     }, [groupName]);
@@ -365,13 +388,23 @@ export default function TaskTemplates() {
                         renderItem={renderItem}
                         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
                         showsVerticalScrollIndicator={false}
-                        onEndReachedThreshold={0.5}
-                        onEndReached={() => {
-                            // [修复] 移除这里的 isLoading 判断，完全依赖 queryList 内部的 loadingRef 判断
-                            // 这样更安全，避免闭包陷阱
-                            if (!hasMore) return;
-                            queryList();
+
+                        // [关键修改] 调整触发距离，0.1 表示剩余 10% 长度时触发
+                        onEndReachedThreshold={0.1}
+
+                        // [关键修改] 配合锁机制，只有在发生真实滚动后才允许触发加载
+                        onMomentumScrollBegin={() => {
+                            onEndReachedCalledDuringMomentum.current = false;
                         }}
+
+                        onEndReached={() => {
+                            // 仅当用户滑动过(锁为false)、且不在加载中、且有更多数据时触发
+                            if (!onEndReachedCalledDuringMomentum.current && hasMore && !loadingRef.current) {
+                                onEndReachedCalledDuringMomentum.current = true; // 重新上锁
+                                queryList();
+                            }
+                        }}
+
                         ListFooterComponent={
                             <View style={styles.footer}>
                                 <Text style={{ color: "#999" }}>
