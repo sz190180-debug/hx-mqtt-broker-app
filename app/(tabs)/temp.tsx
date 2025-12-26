@@ -52,7 +52,7 @@ export default function TaskTemplates() {
     const { width: windowWidth } = useWindowDimensions();
     const insets = useSafeAreaInsets();
 
-    const MIN_ITEM_WIDTH = 120;
+    const MIN_ITEM_WIDTH = 130;
     const CONTAINER_PADDING = 10;
     const numColumns = Math.max(1, Math.floor((windowWidth - CONTAINER_PADDING) / MIN_ITEM_WIDTH));
     const itemSize = (windowWidth - CONTAINER_PADDING - (numColumns + 1) * 10) / numColumns;
@@ -72,6 +72,9 @@ export default function TaskTemplates() {
     const templatesRef = useRef<ITemplateList[]>([]);
     const taskProgressRef = useRef<number[]>([]);
     const timer = useRef<NodeJS.Timeout | null>(null);
+
+    // [新增] 使用 ref 来同步锁定加载状态，解决并发请求导致的跳页问题
+    const loadingRef = useRef(false);
 
     useEffect(() => {
         templatesRef.current = templates;
@@ -100,6 +103,8 @@ export default function TaskTemplates() {
 
         if (topic === client.apiTheme.rep["taskTemp"]()) {
             const res = JSON.parse(message.toString());
+            // [新增] 请求结束，解锁
+            loadingRef.current = false;
             setLoading(false);
 
             const newRecords = res.d.records || [];
@@ -189,9 +194,16 @@ export default function TaskTemplates() {
             ToastAndroid.show(t("tasks.waitForTaskComplete"), ToastAndroid.SHORT);
             return;
         }
+
+        // [修改] 使用 loadingRef.current 进行同步判断
+        if (loadingRef.current) return;
+        // [修改] 检查 hasMore，注意这里保持原逻辑
         if (!hasMore && pageInfoRef.current.pageNum !== 1) return;
 
+        // [修改] 立即加锁
+        loadingRef.current = true;
         setLoading(true);
+
         client.send("taskTemp", {
             payload: {
                 d: {
@@ -233,6 +245,10 @@ export default function TaskTemplates() {
         if (groupName) {
             pageInfoRef.current.pageNum = 1;
             setHasMore(true);
+
+            // [新增] 切换分组时重置锁状态，防止之前的请求卡死后续操作
+            loadingRef.current = false;
+
             setTemplates([]);
             setTimeout(queryList, 0);
         }
