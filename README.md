@@ -49,6 +49,11 @@ Join our community of developers creating universal apps.
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
 
+## 本地调试
+```bash
+npx expo start
+```
+打开模拟器-打开expo Go
 
 ## 云端打包
 

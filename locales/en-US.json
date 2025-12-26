@@ -37,6 +37,7 @@
     "mqttConnected": "MQTT connected",
     "mqttDisconnected": "MQTT disconnected",
     "settings": {
+      "title": "setting",
       "addressModify": "Modify Address",
       "portModify": "Modify Port",
       "confirm": "Confirm"

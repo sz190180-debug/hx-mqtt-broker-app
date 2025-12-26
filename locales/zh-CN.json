@@ -37,6 +37,7 @@
     "mqttConnected": "MQTT连接成功",
     "mqttDisconnected": "MQTT连接断开",
     "settings": {
+      "title": "设置",
       "addressModify": "地址修改",
       "portModify": "修改端口",
       "confirm": "确定"
