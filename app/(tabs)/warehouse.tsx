@@ -6,10 +6,10 @@ import {
     ScrollView,
     TouchableOpacity,
     Alert,
-    Modal, // 确保引入了 Modal
+    Modal,
     FlatList,
     RefreshControl,
-    Dimensions, // 引入 Dimensions 用于辅助定位
+    Dimensions,
     Platform
 } from 'react-native';
 import {Card, Paragraph} from 'tamagui';
@@ -17,7 +17,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import MyMqttClient from '@/utils/mqtt';
 import {t, getCurrentLanguage} from '@/utils/i18n';
 
-// ... (Interface 定义保持不变，此处省略以节省篇幅) ...
 // 接口定义
 interface Warehouse {
     warehouseId: number;
@@ -39,6 +38,8 @@ interface Vertex {
     status: number;
     columnId: number;
     hxMapVertexesId?: number;
+    // === 新增重量字段 ===
+    weight?: number;
     mapVertex?: {
         id: number;
         code: string;
@@ -100,7 +101,6 @@ export default function WarehousePage() {
     const batchUpdateRequestRef = useRef<number | null>(null);
     const batchUpdateInfoRef = useRef<{ positionIds: number[]; status: PositionStatus; } | null>(null);
 
-    // ... (MQTT listenerMessage 逻辑保持不变，此处省略) ...
     const listenerMessage = useCallback((topic: string, message: any) => {
         const res = JSON.parse(message.toString());
         if (topic === client.apiTheme.rep["warehouseAll"]()) {
@@ -195,7 +195,6 @@ export default function WarehousePage() {
         }
     }, [client]);
 
-    // ... (其他辅助函数保持不变，loadWarehouses, updateLocalPositionStatus, batchUpdateStatus 等) ...
     const loadWarehouses = useCallback(() => {
         if (!client.client?.connected) {
             Alert.alert(t('common.error'), t('tasks.mqttNotConnected'));
@@ -348,12 +347,11 @@ export default function WarehousePage() {
 
     return (
         <View style={styles.container}>
-            {/* Header 区域 */}
             <View style={styles.header}>
                 <View style={styles.headerWarehouseSelector}>
                     <TouchableOpacity
                         style={styles.headerSelectButton}
-                        onPress={() => setShowWarehouseSelector(true)} // 这里只负责打开 Modal
+                        onPress={() => setShowWarehouseSelector(true)}
                     >
                         <Text style={styles.headerSelectButtonText}>
                             {selectedWarehouse?.warehouseName || t('warehouse.selectWarehouse')}
@@ -390,7 +388,6 @@ export default function WarehousePage() {
                 </View>
             </View>
 
-            {/* --- 修改点：将下拉选择器改为 Modal 实现，彻底解决 Android 上无法滚动和点击穿透的问题 --- */}
             <Modal
                 transparent={true}
                 visible={showWarehouseSelector}
@@ -406,10 +403,9 @@ export default function WarehousePage() {
                         <FlatList
                             data={warehouses}
                             keyExtractor={(item) => item.warehouseId.toString()}
-                            style={{maxHeight: 250}} // 给一个最大高度
+                            style={{maxHeight: 250}}
                             bounces={false}
                             showsVerticalScrollIndicator={true}
-                            // 关键：flexGrow: 0 确保在内容较少时高度自适应，内容多时可滚动
                             contentContainerStyle={{flexGrow: 0}}
                             ListEmptyComponent={() => (
                                 <View style={{padding: 12, alignItems: 'center'}}>
@@ -439,14 +435,12 @@ export default function WarehousePage() {
                     </View>
                 </TouchableOpacity>
             </Modal>
-            {/* --------------------------------------------------------------------------------- */}
 
             <ScrollView
                 style={styles.scrollView}
                 keyboardShouldPersistTaps="handled"
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh}/>}
             >
-                {/* ... (ScrollView 内容保持不变) ... */}
                 {batchMode && (
                     <Card style={styles.batchTipCard}>
                         <View style={styles.batchTipContainer}>
@@ -465,7 +459,6 @@ export default function WarehousePage() {
                     </Card>
                 )}
 
-                {/* 仓库统计卡片 */}
                 {selectedWarehouse && (
                     <Card style={styles.infoCard}>
                         <Card.Header>
@@ -503,7 +496,6 @@ export default function WarehousePage() {
                     </Card>
                 )}
 
-                {/* 可视化 Grid */}
                 {selectedWarehouse && (
                     <Card style={styles.visualizationCard}>
                         <Card.Header>
@@ -529,17 +521,31 @@ export default function WarehousePage() {
                                                         ]}
                                                         onPress={() => showPositionDetails(vertex)}
                                                     >
-                                                        <Text
-                                                            style={styles.positionText}>{vertex.mapVertex?.codeAlias || vertex.mapVertex?.code || `P${vertex.positionOrder}`}</Text>
+
+                                                        {/* 第一行：编号 */}
+                                                        <Text style={styles.positionText}>
+                                                            {vertex.mapVertex?.codeAlias || vertex.mapVertex?.code || `P${vertex.positionOrder}`}
+                                                        </Text>
+
+                                                        {/* 第二行：重量（仅在有重量时渲染） */}
+                                                        {(vertex.status === PositionStatus.OCCUPIED && vertex.weight && vertex.weight > 0) && (
+                                                            <Text style={[styles.positionText, styles.weightText]}>
+                                                                {`(${vertex.weight} Kg)`}
+                                                            </Text>
+                                                        )}
+
                                                         {batchMode && selectedPositions.has(vertex.positionId) && (
-                                                            <View style={styles.selectedIndicator}><Ionicons
-                                                                name="checkmark" size={12} color="#007bff"/></View>
+                                                            <View style={styles.selectedIndicator}>
+                                                                <Ionicons name="checkmark" size={12} color="#007bff"/>
+                                                            </View>
                                                         )}
                                                     </TouchableOpacity>
                                                 ))
                                             ) : (
-                                                <View style={styles.emptyPosition}><Text
-                                                    style={styles.emptyText}>{loading ? '加载中...' : '无点位'}</Text></View>
+                                                <View style={styles.emptyPosition}>
+                                                    <Text
+                                                        style={styles.emptyText}>{loading ? '加载中...' : '无点位'}</Text>
+                                                </View>
                                             )}
                                         </View>
                                     </View>
@@ -556,7 +562,6 @@ export default function WarehousePage() {
                 )}
             </ScrollView>
 
-            {/* 点位详情模态框 (保持不变) */}
             <Modal visible={showPositionDetailModal} animationType="slide" transparent={true}
                    onRequestClose={() => setShowPositionDetailModal(false)}>
                 <View style={styles.modalOverlay}>
@@ -581,10 +586,21 @@ export default function WarehousePage() {
                                     </View>
                                     <View style={styles.detailRow}>
                                         <Text style={styles.detailLabel}>{t('warehouse.currentStatus')}:</Text>
-                                        <View
-                                            style={[styles.statusBadge, {backgroundColor: statusColors[selectedPosition.status as PositionStatus]}]}>
-                                            <Text
-                                                style={styles.statusText}>{getStatusText(selectedPosition.status as PositionStatus)}</Text>
+                                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                                            <View
+                                                style={[styles.statusBadge, {backgroundColor: statusColors[selectedPosition.status as PositionStatus]}]}>
+                                                <Text
+                                                    style={styles.statusText}>{getStatusText(selectedPosition.status as PositionStatus)}</Text>
+                                            </View>
+                                            {/* === 详情页显示重量 === */}
+                                            {selectedPosition.status === PositionStatus.OCCUPIED && selectedPosition.weight && selectedPosition.weight > 0 && (
+                                                <View style={[styles.statusBadge, {
+                                                    backgroundColor: '#17a2b8',
+                                                    marginLeft: 8
+                                                }]}>
+                                                    <Text style={styles.statusText}>({selectedPosition.weight}kg)</Text>
+                                                </View>
+                                            )}
                                         </View>
                                     </View>
                                 </View>
@@ -618,7 +634,6 @@ export default function WarehousePage() {
                 </View>
             </Modal>
 
-            {/* 批量修改状态模态框 (保持不变) */}
             <Modal visible={showBatchStatusModal} animationType="slide" transparent={true}
                    onRequestClose={() => setShowBatchStatusModal(false)}>
                 <View style={styles.modalOverlay}>
@@ -665,7 +680,6 @@ export default function WarehousePage() {
 }
 
 const styles = StyleSheet.create({
-    // ... 保持大部分样式不变 ...
     container: {
         flex: 1,
         backgroundColor: '#f5f5f5',
@@ -706,16 +720,15 @@ const styles = StyleSheet.create({
         flex: 1,
         fontWeight: '500',
     },
-    // --- 新增 Modal 下拉相关样式 ---
     modalDropdownOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0)', // 透明背景，但捕获点击以关闭
+        backgroundColor: 'rgba(0,0,0,0)',
     },
     modalDropdownContent: {
         position: 'absolute',
-        top: 60, // 距离顶部大约 Header 的高度
+        top: 60,
         left: 16,
-        width: 250, // 下拉框宽度
+        width: 250,
         backgroundColor: '#fff',
         borderRadius: 6,
         borderWidth: 1,
@@ -743,7 +756,6 @@ const styles = StyleSheet.create({
         color: '#1976d2',
         fontWeight: '600',
     },
-    // ----------------------------
     headerButtons: {
         flexDirection: 'row',
         gap: 8,
@@ -759,7 +771,6 @@ const styles = StyleSheet.create({
     successButton: {backgroundColor: '#28a745'},
     primaryButton: {backgroundColor: '#007bff'},
     buttonText: {color: '#fff', fontSize: 12, fontWeight: '500'},
-    // ... 其他样式 (infoCard, visualizationCard 等) 保持原样 ...
     infoCard: {
         marginHorizontal: 16,
         marginTop: 8,
@@ -801,7 +812,7 @@ const styles = StyleSheet.create({
     columnHeader: {fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8, textAlign: 'center'},
     positionsContainer: {gap: 8},
     positionButton: {
-        width: 80,
+        width: 80, // 如果文字特别长，可能需要适当增加宽度，比如 90 或 100
         height: 40,
         borderRadius: 6,
         justifyContent: 'center',
@@ -810,9 +821,20 @@ const styles = StyleSheet.create({
         shadowOffset: {width: 0, height: 1},
         shadowOpacity: 0.2,
         shadowRadius: 2,
-        elevation: 2
+        minHeight: 50,          // 确保有足够高度显示两行
+        paddingVertical: 4,     // 上下留点间距
     },
-    positionText: {color: '#fff', fontSize: 10, fontWeight: '500', textAlign: 'center'},
+    positionText: {
+        color: '#fff',
+        fontSize: 14, // 调小字号以便在一行放下更多内容
+        fontWeight: 'bold',
+        textAlign: 'center',
+    },
+    weightText: {
+        fontSize: 10,           // 重量字号稍微小一点
+        fontWeight: 'normal',   // 重量不需要加粗
+        marginTop: 2,           // 给两行之间加点空隙
+    },
     emptyPosition: {
         width: 80,
         height: 40,
