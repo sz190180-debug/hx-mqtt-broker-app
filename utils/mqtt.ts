@@ -32,6 +32,9 @@ class MyMqttClient {
 
             // [新增] 查询满仓仓库列表请求
             queryFullWarehouse: (payload?: any) => `/iot/req/task/full/warehouse`,
+
+            // === 必须添加这一行，对应后端的 TopicEnum.WAREHOUSE_VERTEXES_UPDATE ===
+            warehouseVertexesUpdate: () => `/iot/${this.options?.clientId}/req/warehouse/vertexes/update`,
         },
         // 订阅
         rep: {
@@ -48,6 +51,9 @@ class MyMqttClient {
 
             // [新增] 接收满仓仓库列表响应
             queryFullWarehouse: (payload?: any) => `/iot/rep/task/full/warehouse`,
+
+            // === 建议也添加这一行，用于接收后端处理成功的响应 ===
+            warehouseVertexesUpdate: () => `/iot/${this.options?.clientId}/rep/warehouse/vertexes/update`,
         },
     };
 

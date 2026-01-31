@@ -153,7 +153,8 @@
       "getPositionDataFailed": "获取点位数据失败",
       "pleaseSelectPositions": "请先选择要修改的点位",
       "confirmBatchModify": "确认批量修改"
-    }
+    },
+    "editPosition": "编辑"
   },
   "notFound": {
     "title": "Oops!",

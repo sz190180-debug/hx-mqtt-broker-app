@@ -9,6 +9,7 @@ import {
     Modal,
     FlatList,
     RefreshControl,
+    TextInput,
     Dimensions,
     Platform
 } from 'react-native';
@@ -38,7 +39,6 @@ interface Vertex {
     status: number;
     columnId: number;
     hxMapVertexesId?: number;
-    // === 新增重量字段 ===
     weight?: number;
     mapVertex?: {
         id: number;
@@ -84,11 +84,18 @@ export default function WarehousePage() {
     const [showWarehouseSelector, setShowWarehouseSelector] = useState(false);
     const [showBatchStatusModal, setShowBatchStatusModal] = useState(false);
 
+    // === 新增：编辑模态框状态 ===
+    const [showEditModal, setShowEditModal] = useState(false);
+
     // 批量操作状态
     const [selectedPositions, setSelectedPositions] = useState<Set<number>>(new Set());
     const [batchMode, setBatchMode] = useState(false);
     const [batchStatus, setBatchStatus] = useState<PositionStatus>(PositionStatus.AVAILABLE);
+
     const [selectedPosition, setSelectedPosition] = useState<Vertex | null>(null);
+    // 编辑相关状态
+    const [editWeight, setEditWeight] = useState<string>('');
+    const [editStatus, setEditStatus] = useState<PositionStatus>(PositionStatus.AVAILABLE);
 
     // 统计数据
     const [usageStats, setUsageStats] = useState({
@@ -175,6 +182,7 @@ export default function WarehousePage() {
                 }
             }
         } else if (topic === client.apiTheme.rep["warehousePositionBatchUpdate"]()) {
+            // ... (批量更新回调保持不变)
             const reqId = res.d.reqId;
             if (batchUpdateRequestRef.current && reqId === batchUpdateRequestRef.current && batchUpdateInfoRef.current) {
                 const batchInfo = batchUpdateInfoRef.current;
@@ -192,8 +200,22 @@ export default function WarehousePage() {
                     Alert.alert(t('common.error'), `${t('warehouse.operations.batchUpdateFailed')}: ${res.d.msg}`);
                 }
             }
+        } else if (topic === client.apiTheme.rep["warehouseVertexesUpdate"]?.() || topic.includes("warehouseVertexesUpdate")) {
+            // 处理单个更新回调
+            if (res.d.code === 10000) {
+                Alert.alert(t('common.success'), '更新成功');
+                setShowEditModal(false); // 关闭编辑框
+                if (selectedPosition) {
+                    // 刷新该列数据
+                    const reqId = Date.now();
+                    pendingRequestsRef.current.set(reqId, `vertexes_${selectedPosition.columnId}`);
+                    client.send("warehouseVertexesList", {payload: {d: {reqId, columnId: selectedPosition.columnId}}});
+                }
+            } else {
+                Alert.alert(t('common.error'), res.d.msg || '更新失败');
+            }
         }
-    }, [client]);
+    }, [client, selectedPosition]);
 
     const loadWarehouses = useCallback(() => {
         if (!client.client?.connected) {
@@ -321,6 +343,7 @@ export default function WarehousePage() {
         if (selectedWarehouse) loadWarehouseColumns(selectedWarehouse.warehouseId);
     }, [loadWarehouses, selectedWarehouse]);
 
+    // 显示详情页（只读）
     const showPositionDetails = (vertex: Vertex) => {
         if (batchMode) togglePositionSelection(vertex.positionId);
         else {
@@ -329,12 +352,61 @@ export default function WarehousePage() {
         }
     };
 
+    // 打开编辑模态框
+    const openEditModal = () => {
+        if (!selectedPosition) return;
+        setEditWeight(selectedPosition.weight ? String(selectedPosition.weight) : '0');
+        setEditStatus(selectedPosition.status as PositionStatus);
+        setShowPositionDetailModal(false); // 关闭详情
+        setShowEditModal(true); // 打开编辑
+    };
+
+    // 处理编辑时的状态切换
+    const handleEditStatusChange = (status: PositionStatus) => {
+        setEditStatus(status);
+        // 如果状态变为可用或禁用，重置重量为0 (前端视觉反馈，后端也会强制处理)
+        if (status === PositionStatus.AVAILABLE || status === PositionStatus.DISABLED) {
+            setEditWeight('0');
+        }
+    };
+
+    // 保存更新（发送包含状态和重量的请求）
+    const saveVertexUpdate = () => {
+        if (!selectedPosition) return;
+        if (!client.client?.connected) {
+            Alert.alert(t('common.error'), t('tasks.mqttNotConnected'));
+            return;
+        }
+
+        const weightVal = parseFloat(editWeight);
+        if (isNaN(weightVal) || weightVal < 0) {
+            Alert.alert(t('common.error'), '请输入有效的重量数值');
+            return;
+        }
+
+        const reqId = Date.now();
+        const payload = {
+            reqId,
+            positionId: selectedPosition.positionId,
+            columnId: selectedPosition.columnId,
+            hxMapVertexesId: selectedPosition.hxMapVertexesId,
+            positionOrder: selectedPosition.positionOrder,
+            status: editStatus, // 使用编辑后的状态
+            weight: weightVal   // 使用编辑后的重量
+        };
+
+        client.send("warehouseVertexesUpdate", {payload: {d: payload}});
+        console.log("发送更新请求:", payload);
+    };
+
     useEffect(() => {
         if (!client.client?.connected) return;
         client.subscribe("warehouseAll");
         client.subscribe("warehouseColumnList");
         client.subscribe("warehouseVertexesList");
         client.subscribe("warehousePositionBatchUpdate");
+        client.subscribe("warehouseVertexesUpdate");
+
         client.listenerMessage("message", listenerMessage);
         loadWarehouses();
         return () => {
@@ -347,6 +419,7 @@ export default function WarehousePage() {
 
     return (
         <View style={styles.container}>
+            {/* Header and Controls ... (unchanged) */}
             <View style={styles.header}>
                 <View style={styles.headerWarehouseSelector}>
                     <TouchableOpacity
@@ -394,6 +467,7 @@ export default function WarehousePage() {
                 animationType="fade"
                 onRequestClose={() => setShowWarehouseSelector(false)}
             >
+                {/* ... Warehouse Selector (unchanged) ... */}
                 <TouchableOpacity
                     style={styles.modalDropdownOverlay}
                     activeOpacity={1}
@@ -441,6 +515,7 @@ export default function WarehousePage() {
                 keyboardShouldPersistTaps="handled"
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh}/>}
             >
+                {/* ... Batch Tip & Info Card (unchanged) ... */}
                 {batchMode && (
                     <Card style={styles.batchTipCard}>
                         <View style={styles.batchTipContainer}>
@@ -496,6 +571,7 @@ export default function WarehousePage() {
                     </Card>
                 )}
 
+                {/* Visualization Grid (unchanged) */}
                 {selectedWarehouse && (
                     <Card style={styles.visualizationCard}>
                         <Card.Header>
@@ -522,12 +598,10 @@ export default function WarehousePage() {
                                                         onPress={() => showPositionDetails(vertex)}
                                                     >
 
-                                                        {/* 第一行：编号 */}
                                                         <Text style={styles.positionText}>
                                                             {vertex.mapVertex?.codeAlias || vertex.mapVertex?.code || `P${vertex.positionOrder}`}
                                                         </Text>
 
-                                                        {/* 第二行：重量（仅在有重量时渲染） */}
                                                         {(vertex.status === PositionStatus.OCCUPIED && vertex.weight && vertex.weight > 0) && (
                                                             <Text style={[styles.positionText, styles.weightText]}>
                                                                 {`(${vertex.weight} Kg)`}
@@ -562,6 +636,7 @@ export default function WarehousePage() {
                 )}
             </ScrollView>
 
+            {/* === 1. 点位详情模态框 (只读) === */}
             <Modal visible={showPositionDetailModal} animationType="slide" transparent={true}
                    onRequestClose={() => setShowPositionDetailModal(false)}>
                 <View style={styles.modalOverlay}>
@@ -573,7 +648,8 @@ export default function WarehousePage() {
                                                                                                           color="#333"/></TouchableOpacity>
                         </View>
                         {selectedPosition && (
-                            <View style={styles.modalBody}>
+                            /* 修改：将 View 改为 ScrollView，防止内容被底部遮挡 */
+                            <ScrollView style={styles.modalBody}>
                                 <View style={styles.detailSection}>
                                     <Text style={styles.sectionTitle}>{t('warehouse.positionDetail')}</Text>
                                     <View style={styles.detailRow}>
@@ -592,17 +668,15 @@ export default function WarehousePage() {
                                                 <Text
                                                     style={styles.statusText}>{getStatusText(selectedPosition.status as PositionStatus)}</Text>
                                             </View>
-                                            {/* === 详情页显示重量 === */}
-                                            {selectedPosition.status === PositionStatus.OCCUPIED && selectedPosition.weight && selectedPosition.weight > 0 && (
-                                                <View style={[styles.statusBadge, {
-                                                    backgroundColor: '#17a2b8',
-                                                    marginLeft: 8
-                                                }]}>
-                                                    <Text style={styles.statusText}>({selectedPosition.weight}kg)</Text>
-                                                </View>
-                                            )}
                                         </View>
                                     </View>
+
+                                    {/* === 详情页显示重量 (只读) === */}
+                                    <View style={styles.detailRow}>
+                                        <Text style={styles.detailLabel}>重量:</Text>
+                                        <Text style={styles.detailValue}>{selectedPosition.weight || 0} kg</Text>
+                                    </View>
+
                                 </View>
                                 {selectedPosition.mapVertex && (
                                     <View style={styles.detailSection}>
@@ -622,18 +696,90 @@ export default function WarehousePage() {
                                                 style={styles.detailValue}>{selectedPosition.mapVertex.theta}°</Text></View>}
                                     </View>
                                 )}
-                            </View>
+                            </ScrollView>
                         )}
                         <View style={styles.modalFooter}>
                             <TouchableOpacity style={[styles.modalButton, styles.cancelButton]}
                                               onPress={() => setShowPositionDetailModal(false)}>
                                 <Text style={styles.cancelButtonText}>{t('common.close')}</Text>
                             </TouchableOpacity>
+                            {/* === 点击编辑跳转到编辑框 === */}
+                            <TouchableOpacity style={[styles.modalButton, styles.warningButton]}
+                                              onPress={openEditModal}>
+                                <Ionicons name="create-outline" size={16} color="#fff" style={{marginRight: 4}}/>
+                                <Text style={styles.confirmButtonText}>{t('warehouse.editPosition') || '编辑'}</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
                 </View>
             </Modal>
 
+            {/* === 2. 点位编辑模态框 === */}
+            <Modal visible={showEditModal} animationType="slide" transparent={true}
+                   onRequestClose={() => setShowEditModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>编辑点位</Text>
+                            <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                                <Ionicons name="close" size={24} color="#333"/>
+                            </TouchableOpacity>
+                        </View>
+                        {selectedPosition && (
+                            <View style={styles.modalBody}>
+                                <View style={styles.detailSection}>
+                                    <Text style={styles.formLabel}>状态：</Text>
+                                    <View style={styles.statusOptions}>
+                                        {Object.values(PositionStatus).filter(v => typeof v === 'number').map((status: number) => (
+                                            <TouchableOpacity
+                                                key={status}
+                                                style={[styles.statusOption, {
+                                                    backgroundColor: statusColors[status as PositionStatus],
+                                                    borderWidth: editStatus === status ? 3 : 1,
+                                                    borderColor: editStatus === status ? '#333' : '#ddd',
+                                                    opacity: editStatus === status ? 1 : 0.7
+                                                }]}
+                                                onPress={() => handleEditStatusChange(status as PositionStatus)}
+                                            >
+                                                <Text
+                                                    style={styles.statusOptionText}>{getStatusText(status as PositionStatus)}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
+
+                                <View style={[styles.detailSection, {marginTop: 20}]}>
+                                    <Text style={styles.formLabel}>重量 (kg)：</Text>
+                                    <TextInput
+                                        style={[styles.input, {width: '100%', textAlign: 'left', fontSize: 16}]}
+                                        value={editWeight}
+                                        onChangeText={setEditWeight}
+                                        keyboardType="numeric"
+                                        placeholder="输入重量"
+                                    />
+                                    {editStatus !== PositionStatus.OCCUPIED && (
+                                        <Text style={{fontSize: 12, color: '#999', marginTop: 4}}>
+                                            提示：可用或禁用状态下，重量将被重置为 0
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
+                        )}
+                        <View style={styles.modalFooter}>
+                            <TouchableOpacity style={[styles.modalButton, styles.cancelButton]}
+                                              onPress={() => setShowEditModal(false)}>
+                                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.modalButton, styles.confirmButton]}
+                                              onPress={saveVertexUpdate}>
+                                <Text style={styles.confirmButtonText}>保存修改</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* === 批量操作模态框 (unchanged) === */}
             <Modal visible={showBatchStatusModal} animationType="slide" transparent={true}
                    onRequestClose={() => setShowBatchStatusModal(false)}>
                 <View style={styles.modalOverlay}>
@@ -850,7 +996,7 @@ const styles = StyleSheet.create({
     emptyState: {alignItems: 'center', paddingVertical: 40},
     emptyStateText: {fontSize: 14, color: '#999', marginTop: 8},
     modalOverlay: {flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center'},
-    modalContent: {backgroundColor: '#fff', borderRadius: 12, width: '90%', maxWidth: 400, maxHeight: '80%'},
+    modalContent: {backgroundColor: '#fff', borderRadius: 12, width: '90%', maxWidth: 400, maxHeight: '90%'},
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -860,7 +1006,7 @@ const styles = StyleSheet.create({
         borderBottomColor: '#e0e0e0'
     },
     modalTitle: {fontSize: 18, fontWeight: 'bold', color: '#333'},
-    modalBody: {padding: 20, maxHeight: 400},
+    modalBody: {padding: 20, maxHeight: 420},
     modalFooter: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
@@ -869,7 +1015,15 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#e0e0e0'
     },
-    modalButton: {paddingHorizontal: 20, paddingVertical: 10, borderRadius: 6, minWidth: 80, alignItems: 'center'},
+    modalButton: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 6,
+        minWidth: 80,
+        alignItems: 'center',
+        flexDirection: 'row',
+        justifyContent: 'center'
+    },
     cancelButton: {backgroundColor: '#6c757d'},
     confirmButton: {backgroundColor: '#007bff'},
     cancelButtonText: {color: '#fff', fontSize: 14, fontWeight: '500'},
@@ -915,7 +1069,26 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     },
     warningButton: {backgroundColor: '#ff9800'},
-    statusOptions: {flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16},
-    statusOption: {paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, minWidth: 80, alignItems: 'center'},
+    statusOptions: {flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8},
+    statusOption: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 8,
+        minWidth: 80,
+        alignItems: 'center',
+        marginBottom: 8
+    },
     statusOptionText: {color: '#fff', fontSize: 14, fontWeight: '500'},
+    input: {
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+        width: 100,
+        textAlign: 'right',
+        fontSize: 14,
+        color: '#333',
+        backgroundColor: '#fff'
+    }
 });
