@@ -29,6 +29,7 @@ class MyMqttClient {
             warehouseColumnList: (payload?: any) => `/iot/${this.options?.clientId}/req/warehouse/column/list`,
             warehouseVertexesList: (payload?: any) => `/iot/${this.options?.clientId}/req/warehouse/vertexes/list`,
             warehousePositionBatchUpdate: (payload?: any) => `/iot/${this.options?.clientId}/req/warehouse/position/batchUpdate`,
+            warehouseUpdate: (payload?: any) => `/iot/${this.options?.clientId}/req/warehouse/update`,
 
             // [新增] 查询满仓仓库列表请求
             queryFullWarehouse: (payload?: any) => `/iot/req/task/full/warehouse`,
@@ -45,6 +46,7 @@ class MyMqttClient {
             warehouseColumnList: (payload?: any) => `/iot/${this.options?.clientId}/rep/warehouse/column/list`,
             warehouseVertexesList: (payload?: any) => `/iot/${this.options?.clientId}/rep/warehouse/vertexes/list`,
             warehousePositionBatchUpdate: (payload?: any) => `/iot/${this.options?.clientId}/rep/warehouse/position/batchUpdate`,
+            warehouseUpdate: (payload?: any) => `/iot/${this.options?.clientId}/rep/warehouse/update`,
 
             // [新增] 接收满仓仓库列表响应
             queryFullWarehouse: (payload?: any) => `/iot/rep/task/full/warehouse`,
