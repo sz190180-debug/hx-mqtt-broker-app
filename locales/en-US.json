@@ -134,10 +134,13 @@
     "angle": "Angle",
     "batchModifyStatus": "Batch Modify Status",
     "confirmModify": "Confirm Modify",
-    "batchOperations": "Batch Operations",
     "modifyStatus": "Modify Status",
     "selectAll": "Select All",
     "clearSelection": "Clear",
+    "editDescription": "Edit Description",
+    "warehouseName": "Warehouse Name",
+    "description": "Description",
+    "enterDescription": "Please enter description",
     "status": {
       "available": "Available",
       "occupied": "Occupied",
@@ -152,7 +155,9 @@
       "getColumnDataFailed": "Failed to get column data",
       "getPositionDataFailed": "Failed to get position data",
       "pleaseSelectPositions": "Please select positions to modify first",
-      "confirmBatchModify": "Confirm Batch Modify"
+      "confirmBatchModify": "Confirm Batch Modify",
+      "updateDescSuccess": "Description updated successfully",
+      "updateDescFailed": "Failed to update description"
     },
     "editPosition": "edit"
   },

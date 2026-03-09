@@ -134,10 +134,13 @@
     "angle": "角度",
     "batchModifyStatus": "批量修改状态",
     "confirmModify": "确定修改",
-    "batchOperations": "批量操作",
     "modifyStatus": "修改状态",
     "selectAll": "全选",
     "clearSelection": "清空",
+    "editDescription": "编辑备注",
+    "warehouseName": "仓库名称",
+    "description": "备注",
+    "enterDescription": "请输入备注信息",
     "status": {
       "available": "可用",
       "occupied": "占用",
@@ -152,7 +155,9 @@
       "getColumnDataFailed": "获取库位列数据失败",
       "getPositionDataFailed": "获取点位数据失败",
       "pleaseSelectPositions": "请先选择要修改的点位",
-      "confirmBatchModify": "确认批量修改"
+      "confirmBatchModify": "确认批量修改",
+      "updateDescSuccess": "备注更新成功",
+      "updateDescFailed": "备注更新失败"
     },
     "editPosition": "编辑"
   },

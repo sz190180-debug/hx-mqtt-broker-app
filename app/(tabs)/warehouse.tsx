@@ -9,9 +9,9 @@ import {
     Modal,
     FlatList,
     RefreshControl,
-    TextInput,
-    Dimensions,
-    Platform
+    Dimensions, // 引入 Dimensions 用于辅助定位
+    Platform,
+    TextInput
 } from 'react-native';
 import {Card, Paragraph} from 'tamagui';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -83,6 +83,7 @@ export default function WarehousePage() {
     const [showPositionDetailModal, setShowPositionDetailModal] = useState(false);
     const [showWarehouseSelector, setShowWarehouseSelector] = useState(false);
     const [showBatchStatusModal, setShowBatchStatusModal] = useState(false);
+    const [showEditDescModal, setShowEditDescModal] = useState(false);
 
     // === 新增：编辑模态框状态 ===
     const [showEditModal, setShowEditModal] = useState(false);
@@ -97,6 +98,9 @@ export default function WarehousePage() {
     const [editWeight, setEditWeight] = useState<string>('');
     const [editStatus, setEditStatus] = useState<PositionStatus>(PositionStatus.AVAILABLE);
 
+    // 编辑备注状态
+    const [editingDescription, setEditingDescription] = useState('');
+
     // 统计数据
     const [usageStats, setUsageStats] = useState({
         total: 0, available: 0, occupied: 0, disabled: 0, usagePercent: 0,
@@ -107,6 +111,8 @@ export default function WarehousePage() {
     const pendingRequestsRef = useRef<Map<number, string>>(new Map());
     const batchUpdateRequestRef = useRef<number | null>(null);
     const batchUpdateInfoRef = useRef<{ positionIds: number[]; status: PositionStatus; } | null>(null);
+    const warehouseUpdateRequestRef = useRef<number | null>(null);
+    const warehouseUpdateInfoRef = useRef<{ warehouseId: number; description: string; } | null>(null);
 
     const listenerMessage = useCallback((topic: string, message: any) => {
         const res = JSON.parse(message.toString());
@@ -182,7 +188,6 @@ export default function WarehousePage() {
                 }
             }
         } else if (topic === client.apiTheme.rep["warehousePositionBatchUpdate"]()) {
-            // ... (批量更新回调保持不变)
             const reqId = res.d.reqId;
             if (batchUpdateRequestRef.current && reqId === batchUpdateRequestRef.current && batchUpdateInfoRef.current) {
                 const batchInfo = batchUpdateInfoRef.current;
@@ -213,6 +218,31 @@ export default function WarehousePage() {
                 }
             } else {
                 Alert.alert(t('common.error'), res.d.msg || '更新失败');
+            }
+        } else if (topic === client.apiTheme.rep["warehouseUpdate"]()) {
+            const reqId = res.d.reqId;
+            console.log('收到仓库更新响应:', res, 'reqId:', reqId);
+
+            if (warehouseUpdateRequestRef.current && reqId === warehouseUpdateRequestRef.current && warehouseUpdateInfoRef.current) {
+                const updateInfo = warehouseUpdateInfoRef.current;
+
+                warehouseUpdateRequestRef.current = null;
+                warehouseUpdateInfoRef.current = null;
+
+                if (res.d.code === 10000) {
+                    Alert.alert(t('common.success'), t('warehouse.operations.updateDescSuccess'));
+
+                    setSelectedWarehouse(prev => prev ? {...prev, description: updateInfo.description} : prev);
+                    setWarehouses(prev => prev.map(w =>
+                        w.warehouseId === updateInfo.warehouseId
+                            ? {...w, description: updateInfo.description}
+                            : w
+                    ));
+
+                    setShowEditDescModal(false);
+                } else {
+                    Alert.alert(t('common.error'), `${t('warehouse.operations.updateDescFailed')}: ${res.d.msg}`);
+                }
             }
         }
     }, [client, selectedPosition]);
@@ -327,6 +357,38 @@ export default function WarehousePage() {
         ]);
     };
 
+    const saveWarehouseDescription = () => {
+        if (!selectedWarehouse) return;
+        if (!client.client?.connected) {
+            Alert.alert(t('common.error'), t('tasks.mqttNotConnected'));
+            return;
+        }
+
+        const reqId = Date.now() + Math.floor(Math.random() * 1000);
+
+        warehouseUpdateRequestRef.current = reqId;
+        warehouseUpdateInfoRef.current = {
+            warehouseId: selectedWarehouse.warehouseId,
+            description: editingDescription
+        };
+
+        console.log('发送仓库更新请求:', {
+            reqId,
+            warehouseId: selectedWarehouse.warehouseId,
+            description: editingDescription
+        });
+
+        client.send("warehouseUpdate", {
+            payload: {
+                d: {
+                    reqId,
+                    warehouseId: selectedWarehouse.warehouseId,
+                    description: editingDescription
+                }
+            }
+        });
+    };
+
     const selectWarehouse = (warehouse: Warehouse) => {
         setSelectedWarehouse(warehouse);
         setSelectedPositions(new Set());
@@ -405,6 +467,7 @@ export default function WarehousePage() {
         client.subscribe("warehouseColumnList");
         client.subscribe("warehouseVertexesList");
         client.subscribe("warehousePositionBatchUpdate");
+        client.subscribe("warehouseUpdate");
         client.subscribe("warehouseVertexesUpdate");
 
         client.listenerMessage("message", listenerMessage);
@@ -414,6 +477,8 @@ export default function WarehousePage() {
             pendingRequestsRef.current.clear();
             batchUpdateRequestRef.current = null;
             batchUpdateInfoRef.current = null;
+            warehouseUpdateRequestRef.current = null;
+            warehouseUpdateInfoRef.current = null;
         };
     }, [client.client?.connected]);
 
@@ -537,9 +602,22 @@ export default function WarehousePage() {
                 {selectedWarehouse && (
                     <Card style={styles.infoCard}>
                         <Card.Header>
-                            <Text style={styles.warehouseTitle}>{selectedWarehouse.warehouseName}</Text>
-                            <Paragraph
-                                style={styles.warehouseDesc}>{selectedWarehouse.description || t('warehouse.noDescription')}</Paragraph>
+                            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start'}}>
+                                <View style={{flex: 1}}>
+                                    <Text style={styles.warehouseTitle}>{selectedWarehouse.warehouseName}</Text>
+                                    <Paragraph
+                                        style={styles.warehouseDesc}>{selectedWarehouse.description || t('warehouse.noDescription')}</Paragraph>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setEditingDescription(selectedWarehouse.description || '');
+                                        setShowEditDescModal(true);
+                                    }}
+                                    style={{padding: 4}}
+                                >
+                                    <Ionicons name="create-outline" size={20} color="#007bff" />
+                                </TouchableOpacity>
+                            </View>
                         </Card.Header>
                         <View style={styles.statsContainer}>
                             <View style={styles.usageStats}>
@@ -821,6 +899,45 @@ export default function WarehousePage() {
                     </View>
                 </View>
             </Modal>
+
+            {/* 编辑备注模态框 */}
+            <Modal visible={showEditDescModal} animationType="slide" transparent={true}
+                   onRequestClose={() => setShowEditDescModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>{t('warehouse.editDescription')}</Text>
+                            <TouchableOpacity onPress={() => setShowEditDescModal(false)}>
+                                <Ionicons name="close" size={24} color="#333"/>
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.modalBody}>
+                            <Text style={styles.formLabel}>{t('warehouse.warehouseName')}:</Text>
+                            <Text style={styles.warehouseNameText}>{selectedWarehouse?.warehouseName}</Text>
+                            <Text style={[styles.formLabel, {marginTop: 16}]}>{t('warehouse.description')}:</Text>
+                            <TextInput
+                                style={styles.textInput}
+                                value={editingDescription}
+                                onChangeText={setEditingDescription}
+                                placeholder={t('warehouse.enterDescription')}
+                                multiline
+                                numberOfLines={4}
+                                textAlignVertical="top"
+                            />
+                        </View>
+                        <View style={styles.modalFooter}>
+                            <TouchableOpacity style={[styles.modalButton, styles.cancelButton]}
+                                              onPress={() => setShowEditDescModal(false)}>
+                                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.modalButton, styles.confirmButton]}
+                                              onPress={saveWarehouseDescription}>
+                                <Text style={styles.confirmButtonText}>{t('common.save')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -1079,6 +1196,22 @@ const styles = StyleSheet.create({
         marginBottom: 8
     },
     statusOptionText: {color: '#fff', fontSize: 14, fontWeight: '500'},
+    textInput: {
+        borderWidth: 1,
+        borderColor: '#dee2e6',
+        borderRadius: 6,
+        padding: 12,
+        fontSize: 14,
+        color: '#333',
+        minHeight: 100,
+        backgroundColor: '#fff'
+    },
+    warehouseNameText: {
+        fontSize: 16,
+        color: '#333',
+        fontWeight: '500',
+        marginBottom: 8
+    },
     input: {
         borderWidth: 1,
         borderColor: '#ccc',
